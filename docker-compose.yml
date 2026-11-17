@@ -1,0 +1,54 @@
+services:
+  db:
+    image: timescale/timescaledb-ha:pg16
+    container_name: poa_flood_db
+    environment:
+      POSTGRES_DB: poa_flood
+      POSTGRES_USER: poa_user
+      POSTGRES_PASSWORD: poa_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poa_user -d poa_flood"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: poa_flood_redis
+    ports:
+      - "6379:6379"
+
+  titiler:
+    image: ghcr.io/developmentseed/titiler:0.18.5
+    container_name: poa_flood_titiler
+    ports:
+      - "8001:80"
+    volumes:
+      - ./data:/data:ro
+
+  api:
+    image: python:3.11-slim
+    container_name: poa_flood_api
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://poa_user:poa_dev_password@db:5432/poa_flood
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "pip install --no-cache-dir fastapi uvicorn pydantic &&
+             uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  pgdata:
