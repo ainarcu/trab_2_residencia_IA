@@ -10,6 +10,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U poa_user -d poa_flood"]
       interval: 10s
@@ -41,13 +42,16 @@ services:
     environment:
       DATABASE_URL: postgresql://poa_user:poa_dev_password@db:5432/poa_flood
       REDIS_URL: redis://redis:6379/0
+      ANA_IDENTIFICADOR: ${ANA_IDENTIFICADOR:-}
+      ANA_SENHA: ${ANA_SENHA:-}
+      INMET_TOKEN: ${INMET_TOKEN:-}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
     command: >
-      sh -c "pip install --no-cache-dir fastapi uvicorn pydantic &&
+      sh -c "pip install --no-cache-dir fastapi uvicorn pydantic sqlalchemy psycopg2-binary httpx &&
              uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
